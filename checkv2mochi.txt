@@ -1,0 +1,116 @@
+repeat task.wait() until game:IsLoaded()
+repeat task.wait() until game.Players and game.Players.LocalPlayer
+
+local plr   = game.Players.LocalPlayer
+local CommF = game.ReplicatedStorage.Remotes.CommF_
+
+-- Thứ tự awaken Dough: Z -> F -> X -> C -> V
+local order = {"Z","F","X","C","V"}
+
+-- Lấy danh sách chiêu đã awaken
+local function getAwakenedInfo()
+    local have = {}
+    local list = {}
+    local data = CommF:InvokeServer("getAwakenedAbilities")
+
+    if data then
+        for _, k90 in pairs(data) do
+            task.wait()
+            if k90.Awakened then
+                have[k90.Key] = true
+                table.insert(list, k90.Key)
+            end
+        end
+    end
+    return have, list
+end
+
+-- ====== TẠO GUI HIỂN THỊ DẠNG STATUS BAR ======
+local guiParent
+do
+    local ok, core = pcall(function()
+        return game:GetService("CoreGui")
+    end)
+    if ok and core then
+        guiParent = core
+    else
+        guiParent = plr:WaitForChild("PlayerGui")
+    end
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DoughAwakenStatusBar"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = guiParent
+
+local label = Instance.new("TextLabel")
+label.Name = "Info"
+label.Size = UDim2.new(0, 600, 0, 50)
+label.Position = UDim2.new(0.5, -300, 0, 10) -- giữa trên màn hình
+label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+label.BackgroundTransparency = 0.3
+label.BorderSizePixel = 1
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextStrokeTransparency = 0.3
+label.Font = Enum.Font.SourceSansBold
+label.TextSize = 18
+label.TextWrapped = false
+label.TextXAlignment = Enum.TextXAlignment.Center
+label.TextYAlignment = Enum.TextYAlignment.Center
+label.RichText = true -- để dùng màu
+label.Parent = screenGui
+
+local function buildStatusText(have, list)
+    local total = #order
+    local awakenedCount = #list
+
+    -- danh sách đã awaken
+    local awakenedStr = "None"
+    if awakenedCount > 0 then
+        awakenedStr = table.concat(list, ", ")
+    end
+
+    -- danh sách chưa awaken
+    local notList = {}
+    for _, key in ipairs(order) do
+        if not have[key] then
+            table.insert(notList, key)
+        end
+    end
+
+    local missingStr = "None"
+    if #notList > 0 then
+        missingStr = table.concat(notList, ", ")
+    end
+
+    -- chiêu tiếp theo
+    local nextSkill = "FULL"
+    if #notList > 0 then
+        nextSkill = notList[1]
+    end
+
+    -- giống style: Current | Next | ...
+    -- Dùng RichText để tô màu giống hình bạn gửi
+    local text = string.format(
+        '<font color="#FFFFFF">Dough: </font><font color="#FFFF00">%d/%d</font>' ..
+        '  |  <font color="#FFFFFF">Current: </font><font color="#00BFFF">%s</font>' ..
+        '  |  <font color="#FFFFFF">Next: </font><font color="#BF00FF">%s</font>' ..
+        '  |  <font color="#FFFFFF">Missing: </font><font color="#FF5555">%s</font>',
+        awakenedCount, total,
+        awakenedStr,
+        nextSkill,
+        missingStr
+    )
+
+    return text
+end
+
+local function updateGUI()
+    local have, list = getAwakenedInfo()
+    label.Text = buildStatusText(have, list)
+end
+
+-- ====== LOOP CHÍNH: chỉ CẬP NHẬT GUI ======
+while task.wait(3) do
+    updateGUI()
+end
